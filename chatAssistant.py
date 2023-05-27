@@ -294,8 +294,7 @@ print(res["result"])
 #os.environ['OPENAI_API_KEY'] = openai.api_key
 readFlag = False
 #qa = None
-#db = Chroma(persist_directory='db',embedding_function=embeddings)
-
+db = Chroma(persist_directory='db',embedding_function=embeddings)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 #modelName = 'ggml-gpt4all-j-v1.3-groovy.bin'
