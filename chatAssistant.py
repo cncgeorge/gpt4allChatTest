@@ -182,6 +182,7 @@ def importFile(fileName):
         print(len(texts))
         db = Chroma.from_documents(texts, embeddings, persist_directory='db')
         db.persist()
+        print('file done..')
         return
 
 def newModels(curModel, llm):
@@ -215,10 +216,12 @@ def createLLM(modelName, llm):
     streaming = False
     verbose = False
     echo = False
-    temp = 3
+    temp = .31
     n_threads = 10
     top_p = .995
     top_k = 40
+    n_ctx = 1000
+
     repeat_penalty = 1.1
     if '-j' in modelName:
         backend = 'gptj'
@@ -230,6 +233,7 @@ def createLLM(modelName, llm):
                   streaming=streaming,
                   echo=echo,
                   temp=temp,
+                  n_ctx=n_ctx,
                   )
     print(f"using a backend of {backend}")
     return llm
@@ -260,14 +264,14 @@ llm = None
 fileName = None
 
 modelName = 'ggml-gpt4all-j-v1.3-groovy.bin'
-#llm =newModels(modelName)
+llm =newModels(modelName,llm)
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 #fileName = 'test.txt'
 #fileName = 'UnconventionalWarfare.pdf'
 
 
 db = Chroma(persist_directory='db',embedding_function=embeddings)
-
+'''
 llm = GPT4All(
     model="ggml-gpt4all-j-v1.3-groovy.bin",
     n_ctx=1000,
@@ -277,7 +281,7 @@ llm = GPT4All(
     echo = False,
     temp = .31,
 )
-
+'''
 #llm = newModels(modelName, llm)
 
 qa = RetrievalQA.from_chain_type(
@@ -404,15 +408,10 @@ while input !="quit()":
         message = message[3:]
         query = message
 
-        ####
-        #this is the working text
-        #newquery = 'Tell me about unconventional warfare?'
 
         docsearch = Chroma(persist_directory="db", embedding_function=embeddings)
         docsearch.persist()
 
-        #chain = RetrievalQAWithSourcesChain.from_chain_type(OpenAI(temperature=0), chain_type="stuff",
-        #                                                    retriever=docsearch.as_retriever())
 
         if len(message)==0:
             user_input = input("What's your question: ")
@@ -425,10 +424,7 @@ while input !="quit()":
             reply = qa(message)
         except Exception as ex:
             print(f"we had an error: {ex}")
-        #reply = chain({"question": myInput}, return_only_outputs=True)
-        #print("Roz: " + reply["answer"].replace('\n', ' '))
-        #if reply['sources'] != '':
-        #    print("Source: " + reply["sources"])
+
         docsearch.persist()
 
     else:
@@ -437,17 +433,8 @@ while input !="quit()":
             docsearch = Chroma(persist_directory='db', embedding_function=embeddings)
             docsearch.persist()
 
-
-            #chain = RetrievalQAWithSourcesChain.from_chain_type(OpenAI(temperature=0), chain_type="stuff",
-            #                                                    retriever=docsearch.as_retriever())
-
-            #reply = qa(message)
-
-            #reply = chain({"question": message}, return_only_outputs=True)
-            #print(f'chain response {reply}')
-            #if reply['result'] != '':
             reply = conversation.run(message)
-            #print('George, try again...\n')
+
 
     if reply == None:
         next
