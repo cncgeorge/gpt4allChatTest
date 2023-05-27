@@ -132,7 +132,6 @@ def chunkItDown(documents):
 def runLocalModel(messages, llm):
     #GPT4All
     # Run model on prompt
-    #gptj.chat_completion()
     response = qa.run(messages)
     #response = llm.chat_completion(messages,default_prompt_footer=False, verbose =False, streaming=False, default_prompt_header=True )
     reply = response["choices"][0]["message"]["content"]
@@ -146,34 +145,7 @@ def gptModel(messages):
     #messages.append({"role":"assistant","content":reply})
     return reply, messages
 
-def startFileImport(embeddings):
-    fileName = input('file name with path: ')
-    #images = convert_from_path(fileName)
-    #print(len(images))
-    loader = PyPDFLoader(fileName)
-    documents = loader.load_and_split()
-    #documents = importPDF(fileName)
-    print(len(documents))
-    print(documents[0])
-    texts = chunkItDown(documents)
-    db = embedTexts(texts,embeddings)
-    readFlag = True
-    return readFlag, db
 
-def embedTexts(texts, embeddings):
-    embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2')
-    #works
-    #embeddings = OpenAIEmbeddings() #openai.Embedding()
-    #
-    db = Chroma.from_documents(texts, embeddings, persist_directory='db')
-    db.persist()
-
-    docSearch = FAISS.from_documents(texts,embeddings)
-    #docSearch = FAISS.from_texts(texts,embeddings)
-    docSearch.save_local('docIndex')
-    #FAISS.save_local(folder_path='',index_name='index.large')
-    #FAISS.write_index(docSearch,'large.index')
-    return db ,docSearch
 
 def createChain():
     #qa = LLMChain(
@@ -197,7 +169,22 @@ def updateDb(texts,embeddings,filePath):
     docsearch = None
 
 
-def newModels(curModel):
+def importFile(fileName):
+    if fileName != None:
+        if fileName[-4:].lower() == '.pdf':
+            loader = PyPDFLoader('UnconventionalWarfare.pdf')
+        elif fileName[-4:].lower() == '.txt':
+            loader = TextLoader(fileName)
+
+        documents = loader.load_and_split()
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1024, chunk_overlap=0)
+        texts = text_splitter.split_documents(documents)
+        print(len(texts))
+        db = Chroma.from_documents(texts, embeddings, persist_directory='db')
+        db.persist()
+        return
+
+def newModels(curModel, llm):
     mymodels = gpt4all.GPT4All.list_models()
     modelNames = []
     selection = input('Try new Model y/n?')
@@ -207,19 +194,24 @@ def newModels(curModel):
             tryMe = input('try this one? y/n')
             if tryMe.lower() == 'y':
                 modelName = model['filename']
-                if os.path.isfile(path=modelName) == False:
-                    gpt4all.GPT4All.download_model(modelName,model_path='')
-                    print(f"your model: {model['filename']} has been downloaded")
-                    break
-                else:
-                    break
+                dlModel(modelName)
+                break
     else:
         modelName = curModel
+        dlModel(modelName)
 
-    llm = createLLM(modelName)
-    return modelName, llm
+    llm = createLLM(modelName, llm)
+    return llm
 
-def createLLM(modelName):
+def dlModel(filename):
+    modelName = filename
+    if os.path.isfile(path=modelName) == False:
+        gpt4all.GPT4All.download_model(modelName, model_path='')
+        print(f"your model: {modelName} has been downloaded")
+    return
+
+
+def createLLM(modelName, llm):
     streaming = False
     verbose = False
     echo = False
@@ -235,18 +227,23 @@ def createLLM(modelName):
 
     llm = GPT4All(model=modelName,
                   backend=backend,
-                  verbose=verbose,
-                  streaming = streaming,
-                  echo = echo,
+                  streaming=streaming,
+                  echo=echo,
                   temp=temp,
-                  top_p = top_p,
-                  top_k = top_k,
-                  repeat_penalty = repeat_penalty,
-                  n_threads = n_threads
                   )
-
     print(f"using a backend of {backend}")
     return llm
+
+    '''
+    streaming = streaming,
+    echo = echo,
+    temp=temp,
+    top_p = top_p,
+    top_k = top_k,
+    repeat_penalty = repeat_penalty,
+    n_threads = n_threads
+    '''
+
 
 
 ##################
@@ -260,24 +257,29 @@ docs = None
 qa_chain = None
 embeddings = None
 llm = None
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-'''
-loader = PyPDFLoader('515-2.pdf')
-documents = loader.load_and_split()
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=1024, chunk_overlap=64)
-texts = text_splitter.split_documents(documents)
-print(len(texts))
+fileName = None
 
-db=Chroma.from_documents(texts, embeddings, persist_directory='db')
-db.persist()
-'''
-'''
+modelName = 'ggml-gpt4all-j-v1.3-groovy.bin'
+#llm =newModels(modelName)
+embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+#fileName = 'test.txt'
+#fileName = 'UnconventionalWarfare.pdf'
+
+
+db = Chroma(persist_directory='db',embedding_function=embeddings)
+
 llm = GPT4All(
     model="ggml-gpt4all-j-v1.3-groovy.bin",
     n_ctx=1000,
     backend="gptj",
-    verbose=False
+    verbose=False,
+    streaming = False,
+    echo = False,
+    temp = .31,
 )
+
+#llm = newModels(modelName, llm)
+
 qa = RetrievalQA.from_chain_type(
     llm=llm,
     chain_type="stuff",
@@ -285,29 +287,31 @@ qa = RetrievalQA.from_chain_type(
     return_source_documents=True,
     verbose=False,
 )
-res = qa(f"""what is this invoice number""")
-print(res["result"])
 '''
-#embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2')
+res = qa('from the document tell me about Roz, who she works with and what she knows.')
 
-#openai.api_key = "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"
+while True:
+    question = input('Enter Question: ')
+    res = qa(question)
+
+print(res["result"])
+
+res = qa(f"who was the invoice from")
+res = qa('in the document, can you tell me how much the total invoice amount is?')
+
+#embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2')
+'''
 #os.environ['OPENAI_API_KEY'] = openai.api_key
 readFlag = False
-#qa = None
-db = Chroma(persist_directory='db',embedding_function=embeddings)
+
+#db = Chroma(persist_directory='db',embedding_function=embeddings)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 #modelName = 'ggml-gpt4all-j-v1.3-groovy.bin'
-modelName = 'ggml-mpt-7b-chat.bin'
-llm = createLLM(modelName)
+#modelName = 'ggml-mpt-7b-chat.bin'
+#llm = createLLM(modelName)
 print(f"Currently running model: {modelName}")
-qa = RetrievalQA.from_chain_type(
-    llm=llm,
-    chain_type="stuff",
-    retriever=db.as_retriever(search_kwargs={"k": 3}),
-    return_source_documents=True,
-    verbose=False,
-)
+
 #resp = qa('tell me about this invoice.')
 #print(resp)
 #embeddings = HuggingFaceEmbeddings()
@@ -366,32 +370,23 @@ while input !="quit()":
     stt = time.time()
     if message.lower() == 'm':
         print("-"*20 + " Menu "+"-"*20)
-        print("\t>t to try new model\n\t>d to doc search\n\t>s to search via duck\n\t>4 for ChatGPT\n\t1 for load a txt file\n\t2 for load a pdf file\n\t3 for chat about pasted txt\n" + "-"*46)
+        print("\t>t to try new model\n\t>d to doc search\n\t>s to search via duck\n\t>4 for ChatGPT\n\t1 for load a file\n" + "-"*46)
         next
     elif message.lower() == '>t':
-        modelName, llm = newModels(modelName)
+        llm = newModels(modelName,llm)
 
     elif message == '>1':
         readFlag = False
         if readFlag == False:
             try:
-                print('importing txt file\n')
-                texts = addTextFile()
+                fileName = input('Enter file name with path: ')
+                print('importing file\n')
+                texts = importFile(fileName)
                 reply = None
                 readFlag = True
             except Exception as ex:
                 print(f'we had an error with the import {ex}')
-    elif message == '>2':
-        readFlag = False
-        if readFlag == False:
-            try:
-                print('importing pdf file\n')
-                texts = importPDF()
-                #updateDb(texts,embeddings)
-                reply = None
-                readFlag=True
-            except Exception as ex:
-                print(f'we had an error with the import {ex}')
+
     elif message == 'quit()':
         break
     elif '>s' in message[0:3].lower():
@@ -425,7 +420,11 @@ while input !="quit()":
             myInput = user_input.strip()
         else:
             myInput = message.strip()
-        reply = qa(message)
+        llm.temp = 0
+        try:
+            reply = qa(message)
+        except Exception as ex:
+            print(f"we had an error: {ex}")
         #reply = chain({"question": myInput}, return_only_outputs=True)
         #print("Roz: " + reply["answer"].replace('\n', ' '))
         #if reply['sources'] != '':
