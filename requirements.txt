@@ -13,7 +13,3 @@ llama-cpp-python
 pdf2image
 chromadb
 pygpt4all
-convert
-llama-cpp-python==0.1.48
-pyllamacpp==2.1.3
-poppler-utils

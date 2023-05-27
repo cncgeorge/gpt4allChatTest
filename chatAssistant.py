@@ -261,7 +261,7 @@ qa_chain = None
 embeddings = None
 llm = None
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-
+'''
 loader = PyPDFLoader('515-2.pdf')
 documents = loader.load_and_split()
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1024, chunk_overlap=64)
@@ -270,6 +270,7 @@ print(len(texts))
 
 db=Chroma.from_documents(texts, embeddings, persist_directory='db')
 db.persist()
+'''
 '''
 llm = GPT4All(
     model="ggml-gpt4all-j-v1.3-groovy.bin",
